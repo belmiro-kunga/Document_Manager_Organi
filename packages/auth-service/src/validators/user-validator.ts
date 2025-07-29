@@ -1,22 +1,12 @@
 // User validation for Authentication Service
 // Validação de usuário para o Serviço de Autenticação
 import Joi from 'joi';
-import { CreateUserInput, UpdateUserInput, AuthUser } from '../models/user';
-import { UserRole, SupportedLanguage } from '@adms/shared';
-
-/**
- * Validation result interface
- */
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-  data?: any;
-}
+import { UserRole, SupportedLanguage, CreateUserInput, UpdateUserInput, ChangePasswordInput } from '../models/user';
 
 /**
  * User creation validation schema
  */
-const createUserSchema = Joi.object({
+export const createUserSchema = Joi.object<CreateUserInput>({
   email: Joi.string()
     .email()
     .required()
@@ -26,7 +16,7 @@ const createUserSchema = Joi.object({
       'string.empty': 'Email é obrigatório',
       'string.max': 'Email deve ter no máximo 255 caracteres'
     }),
-  
+
   username: Joi.string()
     .alphanum()
     .min(3)
@@ -38,451 +28,476 @@ const createUserSchema = Joi.object({
       'string.max': 'Username deve ter no máximo 50 caracteres',
       'string.empty': 'Username é obrigatório'
     }),
-  
+
   firstName: Joi.string()
-    .min(1)
+    .min(2)
     .max(100)
     .required()
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
     .messages({
-      'string.min': 'Nome deve ter pelo menos 1 caractere',
+      'string.min': 'Nome deve ter pelo menos 2 caracteres',
       'string.max': 'Nome deve ter no máximo 100 caracteres',
-      'string.empty': 'Nome é obrigatório'
+      'string.empty': 'Nome é obrigatório',
+      'string.pattern.base': 'Nome deve conter apenas letras e espaços'
     }),
-  
+
   lastName: Joi.string()
-    .min(1)
+    .min(2)
     .max(100)
     .required()
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
     .messages({
-      'string.min': 'Sobrenome deve ter pelo menos 1 caractere',
+      'string.min': 'Sobrenome deve ter pelo menos 2 caracteres',
       'string.max': 'Sobrenome deve ter no máximo 100 caracteres',
-      'string.empty': 'Sobrenome é obrigatório'
+      'string.empty': 'Sobrenome é obrigatório',
+      'string.pattern.base': 'Sobrenome deve conter apenas letras e espaços'
     }),
-  
+
   password: Joi.string()
     .min(8)
     .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .required()
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .messages({
       'string.min': 'Senha deve ter pelo menos 8 caracteres',
       'string.max': 'Senha deve ter no máximo 128 caracteres',
-      'string.pattern.base': 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial',
-      'string.empty': 'Senha é obrigatória'
+      'string.empty': 'Senha é obrigatória',
+      'string.pattern.base': 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'
     }),
-  
+
   role: Joi.string()
-    .valid('admin', 'manager', 'user', 'viewer')
-    .default('user')
+    .valid(...Object.values(UserRole))
+    .default(UserRole.USER)
     .messages({
-      'any.only': 'Role deve ser: admin, manager, user ou viewer'
+      'any.only': 'Role deve ser um dos valores válidos: admin, manager, user, guest'
     }),
-  
+
   language: Joi.string()
-    .valid('pt', 'en', 'fr')
-    .default('pt')
+    .valid(...Object.values(SupportedLanguage))
+    .default(SupportedLanguage.PT)
     .messages({
-      'any.only': 'Idioma deve ser: pt, en ou fr'
+      'any.only': 'Idioma deve ser um dos valores válidos: pt, en, fr'
     }),
-  
+
   department: Joi.string()
     .max(100)
-    .allow(null, '')
+    .optional()
     .messages({
       'string.max': 'Departamento deve ter no máximo 100 caracteres'
     }),
-  
+
   position: Joi.string()
     .max(100)
-    .allow(null, '')
+    .optional()
     .messages({
       'string.max': 'Cargo deve ter no máximo 100 caracteres'
     }),
-  
+
   phone: Joi.string()
     .pattern(/^\+?[1-9]\d{1,14}$/)
-    .allow(null, '')
+    .optional()
     .messages({
-      'string.pattern.base': 'Telefone deve ter um formato válido'
+      'string.pattern.base': 'Telefone deve ter um formato válido (ex: +244123456789)'
     }),
-  
-  sendWelcomeEmail: Joi.boolean().default(true),
-  requireEmailVerification: Joi.boolean().default(false)
+
+  sendWelcomeEmail: Joi.boolean()
+    .default(true),
+
+  requireEmailVerification: Joi.boolean()
+    .default(false)
 });
 
 /**
  * User update validation schema
  */
-const updateUserSchema = Joi.object({
+export const updateUserSchema = Joi.object<UpdateUserInput>({
   firstName: Joi.string()
-    .min(1)
+    .min(2)
     .max(100)
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
+    .optional()
     .messages({
-      'string.min': 'Nome deve ter pelo menos 1 caractere',
-      'string.max': 'Nome deve ter no máximo 100 caracteres'
+      'string.min': 'Nome deve ter pelo menos 2 caracteres',
+      'string.max': 'Nome deve ter no máximo 100 caracteres',
+      'string.pattern.base': 'Nome deve conter apenas letras e espaços'
     }),
-  
+
   lastName: Joi.string()
-    .min(1)
+    .min(2)
     .max(100)
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
+    .optional()
     .messages({
-      'string.min': 'Sobrenome deve ter pelo menos 1 caractere',
-      'string.max': 'Sobrenome deve ter no máximo 100 caracteres'
+      'string.min': 'Sobrenome deve ter pelo menos 2 caracteres',
+      'string.max': 'Sobrenome deve ter no máximo 100 caracteres',
+      'string.pattern.base': 'Sobrenome deve conter apenas letras e espaços'
     }),
-  
+
   email: Joi.string()
     .email()
     .max(255)
+    .optional()
     .messages({
       'string.email': 'Email deve ter um formato válido',
       'string.max': 'Email deve ter no máximo 255 caracteres'
     }),
-  
+
   username: Joi.string()
     .alphanum()
     .min(3)
     .max(50)
+    .optional()
     .messages({
       'string.alphanum': 'Username deve conter apenas letras e números',
       'string.min': 'Username deve ter pelo menos 3 caracteres',
       'string.max': 'Username deve ter no máximo 50 caracteres'
     }),
-  
+
   role: Joi.string()
-    .valid('admin', 'manager', 'user', 'viewer')
+    .valid(...Object.values(UserRole))
+    .optional()
     .messages({
-      'any.only': 'Role deve ser: admin, manager, user ou viewer'
+      'any.only': 'Role deve ser um dos valores válidos: admin, manager, user, guest'
     }),
-  
+
   language: Joi.string()
-    .valid('pt', 'en', 'fr')
+    .valid(...Object.values(SupportedLanguage))
+    .optional()
     .messages({
-      'any.only': 'Idioma deve ser: pt, en ou fr'
+      'any.only': 'Idioma deve ser um dos valores válidos: pt, en, fr'
     }),
-  
+
   department: Joi.string()
     .max(100)
-    .allow(null, '')
+    .optional()
+    .allow(null)
     .messages({
       'string.max': 'Departamento deve ter no máximo 100 caracteres'
     }),
-  
+
   position: Joi.string()
     .max(100)
-    .allow(null, '')
+    .optional()
+    .allow(null)
     .messages({
       'string.max': 'Cargo deve ter no máximo 100 caracteres'
     }),
-  
+
   phone: Joi.string()
     .pattern(/^\+?[1-9]\d{1,14}$/)
-    .allow(null, '')
+    .optional()
+    .allow(null)
     .messages({
-      'string.pattern.base': 'Telefone deve ter um formato válido'
+      'string.pattern.base': 'Telefone deve ter um formato válido (ex: +244123456789)'
     }),
-  
-  isActive: Joi.boolean(),
-  
-  preferences: Joi.object({
-    language: Joi.string().valid('pt', 'en', 'fr'),
-    timezone: Joi.string(),
-    dateFormat: Joi.string(),
-    timeFormat: Joi.string(),
-    theme: Joi.string().valid('light', 'dark', 'auto'),
-    notifications: Joi.object({
-      email: Joi.boolean(),
-      push: Joi.boolean(),
-      sms: Joi.boolean(),
-      desktop: Joi.boolean(),
-      documentUpdates: Joi.boolean(),
-      workflowUpdates: Joi.boolean(),
-      systemUpdates: Joi.boolean(),
-      securityAlerts: Joi.boolean(),
-      marketingEmails: Joi.boolean()
+
+  isActive: Joi.boolean()
+    .optional(),
+
+  preferences: Joi.object()
+    .optional(),
+
+  profile: Joi.object()
+    .optional()
+});
+
+/**
+ * Password change validation schema
+ */
+export const changePasswordSchema = Joi.object<ChangePasswordInput>({
+  currentPassword: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'Senha atual é obrigatória'
     }),
-    dashboard: Joi.object({
-      widgets: Joi.array().items(Joi.string()),
-      layout: Joi.string().valid('grid', 'list'),
-      defaultView: Joi.string().valid('recent', 'favorites', 'assigned'),
-      itemsPerPage: Joi.number().min(10).max(100),
-      showTutorials: Joi.boolean()
+
+  newPassword: Joi.string()
+    .min(8)
+    .max(128)
+    .required()
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .messages({
+      'string.min': 'Nova senha deve ter pelo menos 8 caracteres',
+      'string.max': 'Nova senha deve ter no máximo 128 caracteres',
+      'string.empty': 'Nova senha é obrigatória',
+      'string.pattern.base': 'Nova senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'
     }),
-    privacy: Joi.object({
-      profileVisibility: Joi.string().valid('public', 'private', 'contacts'),
-      showOnlineStatus: Joi.boolean(),
-      allowDirectMessages: Joi.boolean(),
-      shareUsageData: Joi.boolean()
+
+  confirmPassword: Joi.string()
+    .required()
+    .valid(Joi.ref('newPassword'))
+    .messages({
+      'string.empty': 'Confirmação de senha é obrigatória',
+      'any.only': 'Confirmação de senha deve ser igual à nova senha'
     }),
-    accessibility: Joi.object({
-      highContrast: Joi.boolean(),
-      largeText: Joi.boolean(),
-      reduceMotion: Joi.boolean(),
-      screenReader: Joi.boolean(),
-      keyboardNavigation: Joi.boolean()
+
+  logoutOtherSessions: Joi.boolean()
+    .default(false)
+});
+
+/**
+ * Login validation schema
+ */
+export const loginSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .messages({
+      'string.email': 'Email deve ter um formato válido',
+      'string.empty': 'Email é obrigatório'
+    }),
+
+  password: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'Senha é obrigatória'
+    }),
+
+  rememberMe: Joi.boolean()
+    .default(false),
+
+  deviceName: Joi.string()
+    .max(100)
+    .optional()
+    .messages({
+      'string.max': 'Nome do dispositivo deve ter no máximo 100 caracteres'
     })
-  }),
-  
-  profile: Joi.object({
-    displayName: Joi.string().max(255),
-    bio: Joi.string().max(500),
-    website: Joi.string().uri(),
-    location: Joi.string().max(100),
-    jobTitle: Joi.string().max(100),
-    company: Joi.string().max(100),
-    avatar: Joi.string().uri(),
-    coverImage: Joi.string().uri(),
-    isPublic: Joi.boolean(),
-    showContactInfo: Joi.boolean()
-  })
-}).min(1);
+});
 
 /**
- * Password validation schema
+ * Email verification schema
  */
-const passwordSchema = Joi.string()
-  .min(8)
-  .max(128)
-  .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-  .messages({
-    'string.min': 'Senha deve ter pelo menos 8 caracteres',
-    'string.max': 'Senha deve ter no máximo 128 caracteres',
-    'string.pattern.base': 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'
-  });
+export const emailVerificationSchema = Joi.object({
+  token: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'Token de verificação é obrigatório'
+    })
+});
 
 /**
- * Email validation schema
+ * Password reset request schema
  */
-const emailSchema = Joi.string()
-  .email()
-  .max(255)
-  .messages({
-    'string.email': 'Email deve ter um formato válido',
-    'string.max': 'Email deve ter no máximo 255 caracteres'
-  });
+export const passwordResetRequestSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .messages({
+      'string.email': 'Email deve ter um formato válido',
+      'string.empty': 'Email é obrigatório'
+    })
+});
 
 /**
- * Username validation schema
+ * Password reset confirmation schema
  */
-const usernameSchema = Joi.string()
-  .alphanum()
-  .min(3)
-  .max(50)
-  .messages({
-    'string.alphanum': 'Username deve conter apenas letras e números',
-    'string.min': 'Username deve ter pelo menos 3 caracteres',
-    'string.max': 'Username deve ter no máximo 50 caracteres'
-  });
+export const passwordResetConfirmationSchema = Joi.object({
+  token: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'Token de redefinição é obrigatório'
+    }),
+
+  newPassword: Joi.string()
+    .min(8)
+    .max(128)
+    .required()
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .messages({
+      'string.min': 'Nova senha deve ter pelo menos 8 caracteres',
+      'string.max': 'Nova senha deve ter no máximo 128 caracteres',
+      'string.empty': 'Nova senha é obrigatória',
+      'string.pattern.base': 'Nova senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'
+    }),
+
+  confirmPassword: Joi.string()
+    .required()
+    .valid(Joi.ref('newPassword'))
+    .messages({
+      'string.empty': 'Confirmação de senha é obrigatória',
+      'any.only': 'Confirmação de senha deve ser igual à nova senha'
+    })
+});
 
 /**
- * Validate user creation data
+ * User search filters schema
  */
-export function validateCreateUser(data: CreateUserInput): ValidationResult {
-  const { error, value } = createUserSchema.validate(data, { 
-    abortEarly: false,
-    stripUnknown: true 
-  });
+export const userSearchSchema = Joi.object({
+  query: Joi.string()
+    .max(255)
+    .optional()
+    .messages({
+      'string.max': 'Consulta deve ter no máximo 255 caracteres'
+    }),
 
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
-  }
+  role: Joi.string()
+    .valid(...Object.values(UserRole))
+    .optional()
+    .messages({
+      'any.only': 'Role deve ser um dos valores válidos: admin, manager, user, guest'
+    }),
 
-  return {
-    isValid: true,
-    errors: [],
-    data: value
-  };
-}
+  department: Joi.string()
+    .max(100)
+    .optional()
+    .messages({
+      'string.max': 'Departamento deve ter no máximo 100 caracteres'
+    }),
+
+  isActive: Joi.boolean()
+    .optional(),
+
+  isEmailVerified: Joi.boolean()
+    .optional(),
+
+  createdAfter: Joi.date()
+    .optional(),
+
+  createdBefore: Joi.date()
+    .optional(),
+
+  lastLoginAfter: Joi.date()
+    .optional(),
+
+  lastLoginBefore: Joi.date()
+    .optional(),
+
+  page: Joi.number()
+    .integer()
+    .min(1)
+    .default(1)
+    .messages({
+      'number.min': 'Página deve ser maior que 0'
+    }),
+
+  limit: Joi.number()
+    .integer()
+    .min(1)
+    .max(100)
+    .default(20)
+    .messages({
+      'number.min': 'Limite deve ser maior que 0',
+      'number.max': 'Limite deve ser no máximo 100'
+    }),
+
+  sortBy: Joi.string()
+    .valid('createdAt', 'updatedAt', 'lastLoginAt', 'email', 'firstName', 'lastName')
+    .default('createdAt')
+    .messages({
+      'any.only': 'Ordenação deve ser um dos valores válidos'
+    }),
+
+  sortOrder: Joi.string()
+    .valid('asc', 'desc')
+    .default('desc')
+    .messages({
+      'any.only': 'Ordem deve ser asc ou desc'
+    })
+});
 
 /**
- * Validate user update data
+ * Validate user creation input
  */
-export function validateUpdateUser(data: UpdateUserInput): ValidationResult {
-  const { error, value } = updateUserSchema.validate(data, { 
-    abortEarly: false,
-    stripUnknown: true 
-  });
-
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
-  }
-
-  return {
-    isValid: true,
-    errors: [],
-    data: value
-  };
-}
+export const validateCreateUser = (data: any) => {
+  return createUserSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Validate complete user object
+ * Validate user update input
  */
-export function validateUser(data: Partial<AuthUser>): ValidationResult {
-  // This would be used for validating existing user data
-  // Implementation depends on specific requirements
-  return {
-    isValid: true,
-    errors: []
-  };
-}
+export const validateUpdateUser = (data: any) => {
+  return updateUserSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Validate password strength
+ * Validate password change input
  */
-export function validatePassword(password: string): ValidationResult {
-  const { error } = passwordSchema.validate(password);
-
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
-  }
-
-  // Additional password strength checks
-  const strengthChecks = {
-    hasLowercase: /[a-z]/.test(password),
-    hasUppercase: /[A-Z]/.test(password),
-    hasNumbers: /\d/.test(password),
-    hasSpecialChars: /[@$!%*?&]/.test(password),
-    minLength: password.length >= 8,
-    maxLength: password.length <= 128,
-    noCommonPatterns: !isCommonPassword(password)
-  };
-
-  const failedChecks = Object.entries(strengthChecks)
-    .filter(([_, passed]) => !passed)
-    .map(([check]) => getPasswordCheckMessage(check));
-
-  if (failedChecks.length > 0) {
-    return {
-      isValid: false,
-      errors: failedChecks
-    };
-  }
-
-  return {
-    isValid: true,
-    errors: []
-  };
-}
+export const validateChangePassword = (data: any) => {
+  return changePasswordSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Validate email format
+ * Validate login input
  */
-export function validateEmail(email: string): ValidationResult {
-  const { error } = emailSchema.validate(email);
-
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
-  }
-
-  return {
-    isValid: true,
-    errors: []
-  };
-}
+export const validateLogin = (data: any) => {
+  return loginSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Validate username format
+ * Validate email verification input
  */
-export function validateUsername(username: string): ValidationResult {
-  const { error } = usernameSchema.validate(username);
-
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
-  }
-
-  // Additional username checks
-  const reservedUsernames = [
-    'admin', 'administrator', 'root', 'system', 'api', 'www', 'mail',
-    'ftp', 'support', 'help', 'info', 'contact', 'service', 'test'
-  ];
-
-  if (reservedUsernames.includes(username.toLowerCase())) {
-    return {
-      isValid: false,
-      errors: ['Este username está reservado e não pode ser usado']
-    };
-  }
-
-  return {
-    isValid: true,
-    errors: []
-  };
-}
+export const validateEmailVerification = (data: any) => {
+  return emailVerificationSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Check if password is commonly used
+ * Validate password reset request input
  */
-function isCommonPassword(password: string): boolean {
-  const commonPasswords = [
-    'password', '123456', '123456789', 'qwerty', 'abc123',
-    'password123', 'admin', 'letmein', 'welcome', '12345678'
-  ];
-
-  return commonPasswords.includes(password.toLowerCase());
-}
+export const validatePasswordResetRequest = (data: any) => {
+  return passwordResetRequestSchema.validate(data, { abortEarly: false });
+};
 
 /**
- * Get password check error message
+ * Validate password reset confirmation input
  */
-function getPasswordCheckMessage(check: string): string {
-  const messages: Record<string, string> = {
-    hasLowercase: 'Senha deve conter pelo menos uma letra minúscula',
-    hasUppercase: 'Senha deve conter pelo menos uma letra maiúscula',
-    hasNumbers: 'Senha deve conter pelo menos um número',
-    hasSpecialChars: 'Senha deve conter pelo menos um caractere especial (@$!%*?&)',
-    minLength: 'Senha deve ter pelo menos 8 caracteres',
-    maxLength: 'Senha deve ter no máximo 128 caracteres',
-    noCommonPatterns: 'Esta senha é muito comum, escolha uma senha mais segura'
-  };
-
-  return messages[check] || 'Senha não atende aos critérios de segurança';
-}
+export const validatePasswordResetConfirmation = (data: any) => {
+  return passwordResetConfirmationSchema.validate(data, { abortEarly: false });
+};
 
 /**
  * Validate user search filters
  */
-export function validateUserSearchFilters(filters: any): ValidationResult {
-  const schema = Joi.object({
-    query: Joi.string().max(255),
-    role: Joi.string().valid('admin', 'manager', 'user', 'viewer'),
-    department: Joi.string().max(100),
-    isActive: Joi.boolean(),
-    isEmailVerified: Joi.boolean(),
-    createdAfter: Joi.date(),
-    createdBefore: Joi.date(),
-    lastLoginAfter: Joi.date(),
-    lastLoginBefore: Joi.date()
-  });
+export const validateUserSearch = (data: any) => {
+  return userSearchSchema.validate(data, { abortEarly: false });
+};
 
-  const { error, value } = schema.validate(filters, { 
-    abortEarly: false,
-    stripUnknown: true 
-  });
+/**
+ * Custom validation functions
+ */
+export const customValidations = {
+  /**
+   * Check if password meets complexity requirements
+   */
+  isPasswordComplex: (password: string): boolean => {
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[@$!%*?&]/.test(password);
+    const hasMinLength = password.length >= 8;
+    const hasMaxLength = password.length <= 128;
 
-  if (error) {
-    return {
-      isValid: false,
-      errors: error.details.map(detail => detail.message)
-    };
+    return hasLowerCase && hasUpperCase && hasNumbers && hasSpecialChar && hasMinLength && hasMaxLength;
+  },
+
+  /**
+   * Check if email is valid
+   */
+  isEmailValid: (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email) && email.length <= 255;
+  },
+
+  /**
+   * Check if username is valid
+   */
+  isUsernameValid: (username: string): boolean => {
+    const usernameRegex = /^[a-zA-Z0-9]+$/;
+    return usernameRegex.test(username) && username.length >= 3 && username.length <= 50;
+  },
+
+  /**
+   * Check if phone number is valid
+   */
+  isPhoneValid: (phone: string): boolean => {
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    return phoneRegex.test(phone);
+  },
+
+  /**
+   * Check if name is valid (only letters and spaces)
+   */
+  isNameValid: (name: string): boolean => {
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s]+$/;
+    return nameRegex.test(name) && name.length >= 2 && name.length <= 100;
   }
-
-  return {
-    isValid: true,
-    errors: [],
-    data: value
-  };
-}
+};

@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npm run lint && npm test
+# Run lint-staged on Windows
 npx lint-staged

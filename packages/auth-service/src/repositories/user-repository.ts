@@ -1,201 +1,201 @@
-// User Repository for Authentication Service
-// Repositório de Usuários para o Serviço de Autenticação
+// User repository for Authentication Service
+// Repositório de usuário para o Serviço de Autenticação
 import { PoolClient } from 'pg';
+import { DatabaseService } from '../services/database';
 import { 
   AuthUser, 
+  UserRow, 
   CreateUserInput, 
   UpdateUserInput, 
   UserSearchFilters,
-  RefreshToken,
-  ApiKey,
-  SecurityEvent,
-  LoginAttempt
+  UserRole,
+  SupportedLanguage,
+  ExtendedUserPreferences,
+  SecuritySettings,
+  UserProfile
 } from '../models/user';
-import { DatabaseService } from '../services/database';
-import { createLogger, AppError, ValidationError } from '@adms/shared';
-import { validateUser, validateCreateUser, validateUpdateUser } from '../validators/user-validator';
-
-const logger = createLogger({ service: 'auth-service-user-repo' });
 
 /**
- * User Repository class
+ * User repository class
  */
 export class UserRepository {
+  private db = DatabaseService;
+
   /**
    * Create a new user
    */
-  public async create(userData: CreateUserInput): Promise<AuthUser> {
-    try {
-      // Validate input data
-      const validationResult = validateCreateUser(userData);
-      if (!validationResult.isValid) {
-        throw new ValidationError('Invalid user data', validationResult.errors);
+  async create(userData: CreateUserInput, passwordHash: string, passwordSalt: string): Promise<AuthUser> {
+    const query = `
+      INSERT INTO users (
+        email, username, first_name, last_name, password_hash, password_salt,
+        role, language, department, position, phone, is_active,
+        preferences, security_settings, profile, last_password_change
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW()
+      ) RETURNING *
+    `;
+
+    const defaultPreferences: ExtendedUserPreferences = {
+      language: userData.language || SupportedLanguage.PT,
+      timezone: 'Africa/Luanda',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: '24h',
+      theme: 'light',
+      notifications: {
+        email: true,
+        push: true,
+        sms: false,
+        desktop: true,
+        documentUpdates: true,
+        workflowUpdates: true,
+        systemUpdates: true,
+        securityAlerts: true,
+        marketingEmails: false
+      },
+      dashboard: {
+        widgets: ['recent-documents', 'tasks', 'notifications'],
+        layout: 'grid',
+        defaultView: 'recent',
+        itemsPerPage: 20,
+        showTutorials: true
+      },
+      privacy: {
+        profileVisibility: 'private',
+        showOnlineStatus: true,
+        allowDirectMessages: true,
+        shareUsageData: false
+      },
+      accessibility: {
+        highContrast: false,
+        largeText: false,
+        reduceMotion: false,
+        screenReader: false,
+        keyboardNavigation: false
       }
+    };
 
-      const query = `
-        INSERT INTO users (
-          email, username, first_name, last_name, password_hash, password_salt,
-          role, language, department, position, phone, is_active,
-          preferences, security_settings, profile, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 
-          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        ) RETURNING *
-      `;
+    const defaultSecuritySettings: SecuritySettings = {
+      requirePasswordChange: false,
+      maxConcurrentSessions: 5,
+      sessionTimeout: 480, // 8 hours
+      requireReauthentication: false,
+      twoFactorMethods: [],
+      backupCodesGenerated: false,
+      trustedDevices: [],
+      requireDeviceVerification: false,
+      logSecurityEvents: true,
+      alertOnSuspiciousActivity: true
+    };
 
-      const values = [
-        userData.email,
-        userData.username,
-        userData.firstName,
-        userData.lastName,
-        userData.password, // This should be hashed before calling this method
-        '', // Salt will be generated during hashing
-        userData.role || 'user',
-        userData.language || 'pt',
-        userData.department,
-        userData.position,
-        userData.phone,
-        true, // is_active
-        JSON.stringify({}), // preferences
-        JSON.stringify({}), // security_settings
-        JSON.stringify({}) // profile
-      ];
+    const defaultProfile: UserProfile = {
+      displayName: `${userData.firstName} ${userData.lastName}`,
+      phoneNumbers: [],
+      addresses: [],
+      socialLinks: [],
+      isPublic: false,
+      showContactInfo: false
+    };
 
-      const result = await DatabaseService.query<AuthUser>(query, values);
-      
-      if (result.rows.length === 0) {
-        throw new AppError('USER_CREATION_FAILED', 'Failed to create user', 500);
-      }
+    const values = [
+      userData.email,
+      userData.username,
+      userData.firstName,
+      userData.lastName,
+      passwordHash,
+      passwordSalt,
+      userData.role || UserRole.USER,
+      userData.language || SupportedLanguage.PT,
+      userData.department || null,
+      userData.position || null,
+      userData.phone || null,
+      true, // is_active
+      JSON.stringify(defaultPreferences),
+      JSON.stringify(defaultSecuritySettings),
+      JSON.stringify(defaultProfile)
+    ];
 
-      const user = this.mapRowToUser(result.rows[0]);
-      
-      logger.info('User created successfully', {
-        userId: user.id,
-        email: user.email,
-        username: user.username
-      });
-
-      return user;
-    } catch (error) {
-      logger.error('Failed to create user', { error, userData: { ...userData, password: '[REDACTED]' } });
-      throw error;
-    }
+    const result = await this.db.query<UserRow>(query, values);
+    return this.mapRowToUser(result.rows[0]);
   }
 
   /**
    * Find user by ID
    */
-  public async findById(id: string): Promise<AuthUser | null> {
-    try {
-      const query = `
-        SELECT * FROM users 
-        WHERE id = $1 AND deleted_at IS NULL
-      `;
+  async findById(id: string): Promise<AuthUser | null> {
+    const query = `
+      SELECT * FROM users 
+      WHERE id = $1 AND deleted_at IS NULL
+    `;
 
-      const result = await DatabaseService.query<any>(query, [id]);
-      
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      return this.mapRowToUser(result.rows[0]);
-    } catch (error) {
-      logger.error('Failed to find user by ID', { error, userId: id });
-      throw error;
-    }
+    const result = await this.db.query<UserRow>(query, [id]);
+    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Find user by email
    */
-  public async findByEmail(email: string): Promise<AuthUser | null> {
-    try {
-      const query = `
-        SELECT * FROM users 
-        WHERE email = $1 AND deleted_at IS NULL
-      `;
+  async findByEmail(email: string): Promise<AuthUser | null> {
+    const query = `
+      SELECT * FROM users 
+      WHERE email = $1 AND deleted_at IS NULL
+    `;
 
-      const result = await DatabaseService.query<any>(query, [email]);
-      
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      return this.mapRowToUser(result.rows[0]);
-    } catch (error) {
-      logger.error('Failed to find user by email', { error, email });
-      throw error;
-    }
+    const result = await this.db.query<UserRow>(query, [email]);
+    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Find user by username
    */
-  public async findByUsername(username: string): Promise<AuthUser | null> {
-    try {
-      const query = `
-        SELECT * FROM users 
-        WHERE username = $1 AND deleted_at IS NULL
-      `;
+  async findByUsername(username: string): Promise<AuthUser | null> {
+    const query = `
+      SELECT * FROM users 
+      WHERE username = $1 AND deleted_at IS NULL
+    `;
 
-      const result = await DatabaseService.query<any>(query, [username]);
-      
-      if (result.rows.length === 0) {
-        return null;
-      }
+    const result = await this.db.query<UserRow>(query, [username]);
+    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
+  }
 
-      return this.mapRowToUser(result.rows[0]);
-    } catch (error) {
-      logger.error('Failed to find user by username', { error, username });
-      throw error;
-    }
+  /**
+   * Find user by email or username
+   */
+  async findByEmailOrUsername(emailOrUsername: string): Promise<AuthUser | null> {
+    const query = `
+      SELECT * FROM users 
+      WHERE (email = $1 OR username = $1) AND deleted_at IS NULL
+    `;
+
+    const result = await this.db.query<UserRow>(query, [emailOrUsername]);
+    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Update user
    */
-  public async update(id: string, updateData: UpdateUserInput): Promise<AuthUser> {
-    try {
-      // Validate input data
-      const validationResult = validateUpdateUser(updateData);
-      if (!validationResult.isValid) {
-        throw new ValidationError('Invalid update data', validationResult.errors);
-      }
+  async update(id: string, userData: UpdateUserInput, updatedBy?: string): Promise<AuthUser | null> {
+    const updateFields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
 
-      // Build dynamic update query
-      const updateFields: string[] = [];
-      const values: any[] = [];
-      let paramIndex = 1;
-
-      if (updateData.firstName !== undefined) {
-        updateFields.push(`first_name = $${paramIndex++}`);
-        values.push(updateData.firstName);
-      }
-      if (updateData.lastName !== undefined) {
-        updateFields.push(`last_name = $${paramIndex++}`);
-        values.push(updateData.lastName);
-      }
-      if (updateData.email !== undefined) {
-        updateFields.push(`email = $${paramIndex++}`);
-        values.push(updateData.email);
-      }
-      if (updateData.username !== undefined) {
-        updateFields.push(`username = $${paramIndex++}`);
-        values.push(updateData.username);
-      }
-      if (updateData.role !== undefined) {
-        updateFields.push(`role = $${paramIndex++}`);
-        values.push(updateData.role);
-      }
-      if (updateData.language !== undefined) {
-        updateFields.push(`language = $${paramIndex++}`);
-        values.push(updateData.language);
-      }
-      if (updateData.department !== undefined) {
-        updateFields.push(`department = $${paramIndex++}`);
-        values.push(updateData.department);
-      }
-      if (updateData.position !== undefined) {
+    // Build dynamic update query
+    if (userData.firstName !== undefined) {
+      updateFields.push(`first_name = $${paramIndex++}`);
+      values.push(userData.firstName);
+    }
+    if (userData.lastName !== undefined) {
+      updateFields.push(`last_name = $${paramIndex++}`);
+      values.push(userData.lastName);
+    }
+    if (userData.email !== undefined) {
+      updateFields.push(`email = $${paramIndex++}`);
+      values.push(userData.email);
+    }
+    if (userData.username !== undefined) {
+      updateFields.push(`username = $${paramIndex++}`);
+      values.push(userData.username);
+    }
+    if (userDateData.position !== undefined) {
         updateFields.push(`position = $${paramIndex++}`);
         values.push(updateData.position);
       }

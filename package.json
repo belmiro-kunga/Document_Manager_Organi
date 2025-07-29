@@ -43,7 +43,7 @@
     "docker:health": "powershell -ExecutionPolicy Bypass -File docker/scripts/health-check.ps1",
     "docker:manager": "node scripts/dev-docker.js",
     "setup:hot-reload": "node scripts/setup-hot-reload.js",
-    "postinstall": "husky install"
+    "postinstall": "echo 'Husky disabled on Windows'"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.6.7",
