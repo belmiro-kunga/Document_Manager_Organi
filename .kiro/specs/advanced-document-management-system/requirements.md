@@ -135,3 +135,94 @@ Este documento define os requisitos para um Sistema de Gestão Documental Avanç
 4. WHEN exportação é solicitada THEN o sistema SHALL suportar formatos PDF, Word, CSV e XML
 5. WHEN falhas de conectividade ocorrem THEN o sistema SHALL implementar retry automático e fallback
 6. WHEN armazenamento atinge limites THEN o sistema SHALL notificar administradores e sugerir limpeza automática
+
+### Requirement 11
+
+**User Story:** Como utilizador avançado, quero ter acesso a funcionalidades de IA e machine learning, para que possa automatizar tarefas e obter insights inteligentes dos meus documentos.
+
+#### Acceptance Criteria
+
+1. WHEN um documento é carregado THEN o sistema SHALL classificar automaticamente o tipo e categoria
+2. WHEN conteúdo é analisado THEN o sistema SHALL extrair entidades e gerar tags relevantes
+3. WHEN padrões são detectados THEN o sistema SHALL sugerir ações e otimizações
+4. WHEN anomalias são identificadas THEN o sistema SHALL alertar sobre possíveis problemas
+5. WHEN utilizador procura conteúdo THEN o sistema SHALL fornecer sugestões preditivas
+6. WHEN workflows são executados THEN o sistema SHALL otimizar automaticamente baseado em aprendizagem
+
+### Requirement 12
+
+**User Story:** Como utilizador móvel, quero aceder ao sistema offline através de uma PWA, para que possa trabalhar sem conexão à internet.
+
+#### Acceptance Criteria
+
+1. WHEN utilizador acede via mobile THEN o sistema SHALL funcionar como Progressive Web App
+2. WHEN conexão é perdida THEN o sistema SHALL continuar funcionando offline
+3. WHEN documentos são modificados offline THEN o sistema SHALL sincronizar quando voltar online
+4. WHEN conflitos ocorrem THEN o sistema SHALL resolver automaticamente ou solicitar intervenção
+5. WHEN câmara é usada THEN o sistema SHALL capturar e processar documentos com OCR
+6. WHEN notificações são enviadas THEN o sistema SHALL usar push notifications nativas
+
+### Requirement 13
+
+**User Story:** Como gestor empresarial, quero integração com ferramentas Microsoft 365 e Google Workspace, para que possa manter meu workflow existente.
+
+#### Acceptance Criteria
+
+1. WHEN documentos Office são abertos THEN o sistema SHALL permitir edição online integrada
+2. WHEN utilizador usa Teams/Slack THEN o sistema SHALL enviar notificações e permitir ações
+3. WHEN emails são enviados THEN o sistema SHALL integrar com Outlook/Gmail
+4. WHEN reuniões são agendadas THEN o sistema SHALL sincronizar com calendários
+5. WHEN autenticação é necessária THEN o sistema SHALL suportar SSO com Azure AD/Google
+6. WHEN ficheiros são partilhados THEN o sistema SHALL sincronizar com SharePoint/Drive
+
+### Requirement 14
+
+**User Story:** Como responsável de segurança, quero implementar zero trust e biometria, para que possa garantir máxima segurança dos dados.
+
+#### Acceptance Criteria
+
+1. WHEN utilizador acede THEN o sistema SHALL verificar continuamente a identidade
+2. WHEN contexto muda THEN o sistema SHALL reavaliar permissões automaticamente
+3. WHEN biometria está disponível THEN o sistema SHALL suportar autenticação sem senha
+4. WHEN dados sensíveis são acedidos THEN o sistema SHALL aplicar controlos DLP
+5. WHEN comportamento suspeito é detectado THEN o sistema SHALL alertar e restringir acesso
+6. WHEN dispositivos são usados THEN o sistema SHALL verificar confiança e compliance
+
+### Requirement 15
+
+**User Story:** Como analista de negócio, quero dashboards e relatórios avançados, para que possa obter insights e tomar decisões baseadas em dados.
+
+#### Acceptance Criteria
+
+1. WHEN métricas são coletadas THEN o sistema SHALL apresentar dashboards em tempo real
+2. WHEN relatórios são necessários THEN o sistema SHALL permitir criação personalizada
+3. WHEN tendências são identificadas THEN o sistema SHALL fornecer insights preditivos
+4. WHEN compliance é monitorizada THEN o sistema SHALL gerar relatórios automáticos
+5. WHEN dados são exportados THEN o sistema SHALL suportar múltiplos formatos
+6. WHEN alertas são configurados THEN o sistema SHALL notificar sobre métricas críticas
+
+### Requirement 16
+
+**User Story:** Como utilizador colaborativo, quero edição em tempo real e videoconferência, para que possa trabalhar eficientemente com minha equipa.
+
+#### Acceptance Criteria
+
+1. WHEN múltiplos utilizadores editam THEN o sistema SHALL sincronizar mudanças em tempo real
+2. WHEN conflitos ocorrem THEN o sistema SHALL resolver automaticamente ou mostrar opções
+3. WHEN reuniões são necessárias THEN o sistema SHALL permitir videoconferência integrada
+4. WHEN ecrã é partilhado THEN o sistema SHALL permitir colaboração visual
+5. WHEN sessões são gravadas THEN o sistema SHALL armazenar e indexar conteúdo
+6. WHEN whiteboard é usado THEN o sistema SHALL permitir desenho colaborativo
+
+### Requirement 17
+
+**User Story:** Como utilizador com necessidades especiais, quero interface acessível e personalizável, para que possa usar o sistema confortavelmente.
+
+#### Acceptance Criteria
+
+1. WHEN utilizador tem deficiência visual THEN o sistema SHALL suportar leitores de ecrã
+2. WHEN contraste é necessário THEN o sistema SHALL oferecer modo alto contraste
+3. WHEN teclado é usado THEN o sistema SHALL suportar navegação completa por teclado
+4. WHEN idioma é alterado THEN o sistema SHALL adaptar formatação cultural
+5. WHEN tema é mudado THEN o sistema SHALL suportar modo escuro e claro
+6. WHEN dashboard é personalizado THEN o sistema SHALL salvar preferências do utilizador

@@ -34,7 +34,8 @@ graph TB
         POSTGRES[(PostgreSQL)]
         ELASTIC[(ElasticSearch)]
         REDIS[(Redis Cache)]
-        S3[(Object Storage)]
+        LOCAL[(Local Storage)]
+        S3[(Cloud Storage)]
     end
     
     subgraph "External Services"
@@ -55,6 +56,7 @@ graph TB
     GATEWAY --> NOTIFICATION
     
     DOC --> POSTGRES
+    DOC --> LOCAL
     DOC --> S3
     SEARCH --> ELASTIC
     COLLAB --> REDIS
@@ -98,10 +100,11 @@ interface AuthService {
 ### 2. Document Service
 
 **Responsabilidades:**
-- Upload e armazenamento de documentos
+- Upload e armazenamento de documentos (local e cloud)
 - Gestão de metadados e versionamento
 - Operações CRUD em documentos e pastas
-- Integração com object storage (S3/R2/Wasabi)
+- Integração com múltiplos storage backends
+- Migração entre storage providers
 
 **APIs Principais:**
 ```typescript
@@ -114,6 +117,14 @@ interface DocumentService {
   moveDocument(documentId: string, targetFolderId: string): Promise<void>
   getDocumentVersions(documentId: string): Promise<DocumentVersion[]>
   restoreVersion(documentId: string, versionId: string): Promise<Document>
+  migrateStorage(documentId: string, targetProvider: StorageProvider): Promise<void>
+  getStorageStats(): Promise<StorageStatistics>
+}
+
+interface StorageProvider {
+  type: 'local' | 's3' | 'r2' | 'wasabi'
+  config: StorageConfig
+  isDefault: boolean
 }
 ```
 
@@ -311,6 +322,55 @@ interface WorkflowStep {
 - `ocr_results` - Resultados de processamento OCR
 - `analysis_cache` - Cache de análises de documentos
 
+## Storage Strategy
+
+### Multi-Provider Storage Architecture
+
+O sistema suporta múltiplos provedores de armazenamento com failover automático e migração transparente:
+
+**Storage Providers Suportados:**
+- **Local Storage** - Armazenamento no filesystem local
+- **AWS S3** - Amazon Simple Storage Service
+- **Cloudflare R2** - S3-compatible com zero egress fees
+- **Wasabi** - Hot cloud storage S3-compatible
+
+**Storage Configuration:**
+```typescript
+interface StorageConfig {
+  local?: {
+    basePath: string
+    maxSize: number
+    backupEnabled: boolean
+  }
+  s3?: {
+    bucket: string
+    region: string
+    accessKey: string
+    secretKey: string
+    endpoint?: string
+  }
+  r2?: {
+    bucket: string
+    accountId: string
+    accessKey: string
+    secretKey: string
+  }
+  wasabi?: {
+    bucket: string
+    region: string
+    accessKey: string
+    secretKey: string
+  }
+}
+```
+
+**Storage Features:**
+- **Hybrid Storage** - Documentos podem estar em diferentes providers
+- **Auto-tiering** - Migração automática baseada em políticas
+- **Backup Strategy** - Replicação entre local e cloud
+- **Cost Optimization** - Escolha automática do provider mais económico
+- **Compliance** - Armazenamento local para dados sensíveis
+
 ### Python Service Technology Stack
 
 **Core Framework:**
@@ -451,3 +511,214 @@ graph LR
 - Warning alerts para degradação de performance
 - Business alerts para métricas anómalas
 - Integration com Slack/Teams para notificações
+
+## Multilingual System & Cultural Adaptation
+
+### Multilingual Support (PT/EN/FR)
+
+O sistema é desenvolvido com **português como língua principal** e inglês/francês como línguas secundárias:
+
+**Language Priority:**
+1. **Português (PT)** - Língua principal, padrão do sistema
+2. **English (EN)** - Língua secundária para utilizadores internacionais
+3. **Français (FR)** - Língua secundária para países francófonos
+
+**Frontend Multilingual Features:**
+```typescript
+interface MultilingualConfig {
+  primaryLanguage: 'pt-PT'
+  secondaryLanguages: ['en-US', 'fr-FR']
+  fallbackChain: ['pt-PT', 'en-US', 'fr-FR']
+  autoDetection: true
+  userPreference: true
+}
+```
+
+**Dynamic Language Switching:**
+- **Real-time switching** - Mudança de idioma sem reload
+- **User preferences** - Configuração salva por utilizador
+- **URL routing** - /pt/, /en/, /fr/ para SEO
+- **Language detection** - Automática baseada no browser
+- **Fallback system** - FR→EN→PT se tradução não existir
+
+**Localization per Language:**
+```typescript
+interface LanguageConfig {
+  'pt-PT': {
+    country: 'AO',
+    currency: 'AOA',
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: { decimal: ',', thousands: '.' },
+    timezone: 'Africa/Luanda'
+  },
+  'en-US': {
+    country: 'US',
+    currency: 'USD',
+    dateFormat: 'MM/DD/YYYY',
+    numberFormat: { decimal: '.', thousands: ',' },
+    timezone: 'America/New_York'
+  },
+  'fr-FR': {
+    country: 'FR',
+    currency: 'EUR',
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: { decimal: ',', thousands: ' ' },
+    timezone: 'Europe/Paris'
+  }
+}
+```
+
+**Multilingual Document Processing:**
+- **OCR Multilíngue** - Tesseract com PT/EN/FR + detecção automática
+- **NLP Multilíngue** - spaCy com modelos para as 3 línguas
+- **AI Translation** - Tradução automática entre idiomas
+- **Language Detection** - Identificação automática do idioma do documento
+
+**Cultural Adaptations:**
+- **Portuguese Context** - Práticas angolanas e lusófonas
+- **English Context** - Padrões internacionais de negócio
+- **French Context** - Práticas francófonas africanas
+- **Multi-currency** - Kwanza, Dollar, Euro conforme idioma
+- **Legal Templates** - Documentos legais em cada idioma
+
+**User Experience:**
+```typescript
+// Exemplo de interface multilíngue
+interface UserInterface {
+  languageSelector: {
+    current: 'pt-PT',
+    available: ['pt-PT', 'en-US', 'fr-FR'],
+    flags: true,
+    labels: {
+      'pt-PT': 'Português',
+      'en-US': 'English', 
+      'fr-FR': 'Français'
+    }
+  }
+}
+```
+
+## Advanced Features Architecture
+
+### AI & Machine Learning Layer
+
+```mermaid
+graph TB
+    subgraph "AI/ML Services"
+        DOC_INTEL[Document Intelligence]
+        PREDICT[Predictive Analytics]
+        AUTO[Smart Automation]
+        ML_MODELS[ML Models]
+    end
+    
+    subgraph "Analytics Layer"
+        DASHBOARD[Analytics Dashboard]
+        REPORTS[Custom Reports]
+        COMPLIANCE[Compliance Analytics]
+        BI[Business Intelligence]
+    end
+    
+    subgraph "Security Layer"
+        ZERO_TRUST[Zero Trust]
+        BIOMETRIC[Biometric Auth]
+        DLP[Data Loss Prevention]
+        ENCRYPTION[Advanced Encryption]
+    end
+    
+    DOC_INTEL --> ML_MODELS
+    PREDICT --> DASHBOARD
+    AUTO --> COMPLIANCE
+```
+
+### Advanced Capabilities
+
+**🤖 Document Intelligence:**
+```typescript
+interface DocumentIntelligence {
+  classifyDocument(content: Buffer): Promise<DocumentClass>
+  extractEntities(text: string): Promise<Entity[]>
+  detectAnomalies(document: Document): Promise<AnomalyReport>
+  generateTags(content: string): Promise<string[]>
+  assessCompliance(document: Document): Promise<ComplianceScore>
+}
+```
+
+**📱 Progressive Web App:**
+```typescript
+interface PWACapabilities {
+  offlineStorage: IndexedDBManager
+  syncManager: BackgroundSyncManager
+  pushNotifications: NotificationManager
+  cameraCapture: MediaCaptureManager
+  biometricAuth: WebAuthnManager
+}
+```
+
+**🔗 Enterprise Integrations:**
+```typescript
+interface EnterpriseConnectors {
+  microsoft365: {
+    office: OfficeOnlineConnector
+    sharepoint: SharePointConnector
+    teams: TeamsConnector
+    outlook: OutlookConnector
+  }
+  google: {
+    workspace: GoogleWorkspaceConnector
+    drive: GoogleDriveConnector
+    calendar: GoogleCalendarConnector
+  }
+  communication: {
+    slack: SlackConnector
+    teams: TeamsConnector
+    webhooks: WebhookManager
+  }
+}
+```
+
+**🔒 Zero Trust Security:**
+```typescript
+interface ZeroTrustArchitecture {
+  continuousAuth: ContinuousAuthManager
+  contextualAccess: ContextualAccessManager
+  deviceTrust: DeviceTrustManager
+  behavioralAnalytics: BehavioralAnalyticsManager
+  microPerimeters: MicroPerimeterManager
+}
+```
+
+**📊 Advanced Analytics:**
+```typescript
+interface AdvancedAnalytics {
+  realTimeMetrics: MetricsCollector
+  userBehavior: BehaviorAnalyzer
+  predictiveInsights: PredictiveEngine
+  customReports: ReportBuilder
+  complianceDashboard: ComplianceMonitor
+}
+```
+
+**🎨 Advanced UI/UX:**
+```typescript
+interface AdvancedUX {
+  customizableDashboard: DashboardBuilder
+  darkMode: ThemeManager
+  accessibility: AccessibilityManager
+  keyboardShortcuts: ShortcutManager
+  bulkOperations: BulkOperationManager
+}
+```
+
+### Performance & Scalability
+
+**Caching Strategy:**
+- **L1 Cache** - Browser/PWA cache
+- **L2 Cache** - Redis distributed cache
+- **L3 Cache** - CDN edge cache
+- **Smart Prefetching** - ML-based content prediction
+
+**Scalability Patterns:**
+- **Horizontal Scaling** - Auto-scaling containers
+- **Database Sharding** - Partitioned data
+- **Event Sourcing** - Audit trail optimization
+- **CQRS** - Read/write separation
