@@ -1,0 +1,22 @@
+{
+  "watch": ["src/**/*.ts", "src/**/*.js"],
+  "ext": "ts,js,json",
+  "ignore": [
+    "node_modules/**/*",
+    "dist/**/*",
+    "**/*.test.ts",
+    "**/*.test.js",
+    "coverage/**/*"
+  ],
+  "exec": "npm run build && npm start",
+  "env": {
+    "NODE_ENV": "development",
+    "HOT_RELOAD": "true",
+    "CHOKIDAR_USEPOLLING": "true",
+    "CHOKIDAR_INTERVAL": "1000"
+  },
+  "delay": 1000,
+  "verbose": true,
+  "legacyWatch": true,
+  "polling": true
+}

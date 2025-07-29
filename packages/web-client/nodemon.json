@@ -1,0 +1,28 @@
+{
+  "watch": [
+    "src/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.jsx",
+    "src/**/*.js",
+    "src/**/*.css"
+  ],
+  "ext": "ts,js,json",
+  "ignore": [
+    "node_modules/**/*",
+    "dist/**/*",
+    "**/*.test.ts",
+    "**/*.test.js",
+    "coverage/**/*"
+  ],
+  "exec": "npm run build && npm start",
+  "env": {
+    "NODE_ENV": "development",
+    "VITE_HMR_HOST": "localhost",
+    "VITE_HMR_PORT": "5173",
+    "CHOKIDAR_USEPOLLING": "true"
+  },
+  "delay": 1000,
+  "verbose": true,
+  "legacyWatch": true,
+  "polling": true
+}

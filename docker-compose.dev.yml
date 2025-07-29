@@ -1,0 +1,192 @@
+version: "3.8"
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: adms-postgres-dev
+    environment:
+      POSTGRES_DB: adms_dev
+      POSTGRES_USER: adms_user
+      POSTGRES_PASSWORD: adms_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - adms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adms_user -d adms_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: adms-redis-dev
+    command: redis-server --appendonly yes --requirepass redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - adms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ElasticSearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: adms-elasticsearch-dev
+    environment:
+      - node.name=adms-es-node
+      - cluster.name=adms-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - adms-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # MinIO (S3-compatible storage for testing)
+  minio:
+    image: minio/minio:latest
+    container_name: adms-minio-dev
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_DEFAULT_BUCKETS: adms-documents,adms-backups
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+      - ./storage/minio:/minio-data
+    networks:
+      - adms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # MinIO Client (for bucket creation)
+  minio-client:
+    image: minio/mc:latest
+    container_name: adms-minio-client-dev
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 minioadmin minioadmin123;
+      mc mb minio/adms-documents --ignore-existing;
+      mc mb minio/adms-backups --ignore-existing;
+      mc policy set public minio/adms-documents;
+      echo 'MinIO buckets created successfully';
+      "
+    networks:
+      - adms-network
+
+  # Kibana (for ElasticSearch visualization - optional)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: adms-kibana-dev
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: ""
+      ELASTICSEARCH_PASSWORD: ""
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - adms-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Application Services (will be added in Task 1.3)
+  # auth-service:
+  #   build:
+  #     context: .
+  #     dockerfile: packages/auth-service/Dockerfile
+  #   container_name: adms-auth-service-dev
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://adms_user:adms_password@postgres:5432/adms_dev
+  #     REDIS_URL: redis://:redis_password@redis:6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./packages/auth-service:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - adms-network
+  #   restart: unless-stopped
+
+# Networks
+networks:
+  adms-network:
+    driver: bridge
+    name: adms-network
+
+# Volumes
+volumes:
+  postgres_data:
+    driver: local
+    name: adms-postgres-data
+  redis_data:
+    driver: local
+    name: adms-redis-data
+  elasticsearch_data:
+    driver: local
+    name: adms-elasticsearch-data
+  minio_data:
+    driver: local
+    name: adms-minio-data

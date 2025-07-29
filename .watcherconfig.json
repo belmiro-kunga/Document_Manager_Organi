@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "name": "Advanced DMS Development",
+      "rootPath": ".",
+      "paths": [
+        "packages/*/src/**/*.{ts,js,tsx,jsx}",
+        "packages/*/src/**/*.{py}",
+        "packages/shared/src/**/*.ts"
+      ],
+      "ignore": [
+        "node_modules/**",
+        "dist/**",
+        "build/**",
+        "**/*.test.{ts,js}",
+        "coverage/**"
+      ],
+      "commands": [
+        {
+          "match": "packages/auth-service/src/**/*.{ts,js}",
+          "command": "docker compose restart auth-service",
+          "runInTerminal": false
+        },
+        {
+          "match": "packages/document-service/src/**/*.{ts,js}",
+          "command": "docker compose restart document-service",
+          "runInTerminal": false
+        },
+        {
+          "match": "packages/web-client/src/**/*.{ts,tsx,js,jsx}",
+          "command": "echo \"Hot reload handled by Vite\"",
+          "runInTerminal": false
+        },
+        {
+          "match": "packages/python-analysis/src/**/*.py",
+          "command": "echo \"Hot reload handled by uvicorn\"",
+          "runInTerminal": false
+        },
+        {
+          "match": "packages/shared/src/**/*.ts",
+          "command": "docker compose restart auth-service document-service",
+          "runInTerminal": false
+        }
+      ]
+    }
+  ]
+}

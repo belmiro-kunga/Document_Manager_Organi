@@ -1,0 +1,54 @@
+# Docker Compose override for development hot reload
+# Override do Docker Compose para hot reload em desenvolvimento
+
+version: "3.8"
+
+services:
+  auth-service:
+    volumes:
+      - ./packages/auth-service:/app/packages/auth-service
+      - ./packages/shared:/app/packages/shared
+      - /app/packages/auth-service/node_modules
+      - /app/packages/shared/node_modules
+    environment:
+      NODE_ENV: development
+      HOT_RELOAD: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+    command: npm run dev
+
+  document-service:
+    volumes:
+      - ./packages/document-service:/app/packages/document-service
+      - ./packages/shared:/app/packages/shared
+      - /app/packages/document-service/node_modules
+      - /app/packages/shared/node_modules
+    environment:
+      NODE_ENV: development
+      HOT_RELOAD: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+    command: npm run dev
+
+  web-client:
+    volumes:
+      - ./packages/web-client:/app/packages/web-client
+      - ./packages/shared:/app/packages/shared
+      - /app/packages/web-client/node_modules
+      - /app/packages/shared/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_HMR_HOST: localhost
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    command: npm run dev
+
+  python-analysis:
+    volumes:
+      - ./packages/python-analysis/src:/app/src
+      - ./packages/python-analysis/tests:/app/tests
+    environment:
+      PYTHONUNBUFFERED: "1"
+      RELOAD: "true"
+    command: python -m uvicorn src.adms_analysis.main:app --reload --host 0.0.0.0 --port 8001
