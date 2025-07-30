@@ -1,9 +1,58 @@
 // Environment configuration for Authentication Service
 // Configuração de ambiente para o Serviço de Autenticação
-import { EnvironmentConfig } from '@adms/shared';
 
-// Extend base configuration with auth-specific settings
-class AuthEnvironmentConfig extends EnvironmentConfig {
+// Base environment configuration class
+class AuthEnvironmentConfig {
+  /**
+   * Get environment variable
+   */
+  public get(key: string): string | undefined {
+    return process.env[key];
+  }
+
+  /**
+   * Get environment name
+   */
+  public getEnvironment(): string {
+    return process.env.NODE_ENV || 'development';
+  }
+
+  /**
+   * Check if development environment
+   */
+  public isDevelopment(): boolean {
+    return this.getEnvironment() === 'development';
+  }
+
+  /**
+   * Check if production environment
+   */
+  public isProduction(): boolean {
+    return this.getEnvironment() === 'production';
+  }
+
+  /**
+   * Check if test environment
+   */
+  public isTest(): boolean {
+    return this.getEnvironment() === 'test';
+  }
+
+  /**
+   * Get database URL
+   */
+  public getDatabaseUrl(): string {
+    return this.get('DATABASE_URL') || 
+           `postgresql://${this.get('DATABASE_USER')}:${this.get('DATABASE_PASSWORD')}@${this.get('DATABASE_HOST')}:${this.get('DATABASE_PORT')}/${this.get('DATABASE_NAME')}`;
+  }
+
+  /**
+   * Get Redis URL
+   */
+  public getRedisUrl(): string {
+    return this.get('REDIS_URL') || 
+           `redis://${this.get('REDIS_HOST')}:${this.get('REDIS_PORT')}/${this.get('REDIS_DB') || '0'}`;
+  }
   /**
    * Get JWT configuration
    */
