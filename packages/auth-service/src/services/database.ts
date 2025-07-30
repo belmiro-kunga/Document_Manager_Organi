@@ -390,6 +390,182 @@ export class DatabaseService {
             CREATE INDEX IF NOT EXISTS idx_trusted_devices_fingerprint ON trusted_devices(fingerprint);
             CREATE INDEX IF NOT EXISTS idx_trusted_devices_active ON trusted_devices(is_active);
           `
+        },
+        {
+          name: '008_create_documents_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS documents (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name VARCHAR(255) NOT NULL,
+              description TEXT,
+              type VARCHAR(50) NOT NULL,
+              status VARCHAR(50) NOT NULL DEFAULT 'active',
+              access_level VARCHAR(50) NOT NULL DEFAULT 'internal',
+              folder_id UUID,
+              path TEXT NOT NULL,
+              current_version_id UUID,
+              version_count INTEGER NOT NULL DEFAULT 1,
+              storage JSONB NOT NULL DEFAULT '{}',
+              metadata JSONB NOT NULL DEFAULT '{}',
+              view_count INTEGER NOT NULL DEFAULT 0,
+              download_count INTEGER NOT NULL DEFAULT 0,
+              share_count INTEGER NOT NULL DEFAULT 0,
+              comment_count INTEGER NOT NULL DEFAULT 0,
+              last_viewed_at TIMESTAMP,
+              last_downloaded_at TIMESTAMP,
+              last_modified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              is_favorite BOOLEAN NOT NULL DEFAULT false,
+              is_locked BOOLEAN NOT NULL DEFAULT false,
+              locked_by UUID REFERENCES users(id),
+              locked_at TIMESTAMP,
+              lock_reason TEXT,
+              searchable_text TEXT,
+              indexed_at TIMESTAMP,
+              search_vector TSVECTOR,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              deleted_at TIMESTAMP,
+              created_by UUID REFERENCES users(id),
+              updated_by UUID REFERENCES users(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_documents_name ON documents(name);
+            CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type);
+            CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+            CREATE INDEX IF NOT EXISTS idx_documents_access_level ON documents(access_level);
+            CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents(folder_id);
+            CREATE INDEX IF NOT EXISTS idx_documents_created_by ON documents(created_by);
+            CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at);
+            CREATE INDEX IF NOT EXISTS idx_documents_updated_at ON documents(updated_at);
+            CREATE INDEX IF NOT EXISTS idx_documents_deleted_at ON documents(deleted_at);
+            CREATE INDEX IF NOT EXISTS idx_documents_last_modified_at ON documents(last_modified_at);
+            CREATE INDEX IF NOT EXISTS idx_documents_is_favorite ON documents(is_favorite);
+            CREATE INDEX IF NOT EXISTS idx_documents_is_locked ON documents(is_locked);
+            CREATE INDEX IF NOT EXISTS idx_documents_search_vector ON documents USING gin(search_vector);
+            CREATE INDEX IF NOT EXISTS idx_documents_searchable_text ON documents USING gin(to_tsvector('portuguese', searchable_text));
+          `
+        },
+        {
+          name: '009_create_document_versions_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS document_versions (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+              version_number INTEGER NOT NULL,
+              status VARCHAR(50) NOT NULL DEFAULT 'current',
+              comment TEXT,
+              storage JSONB NOT NULL DEFAULT '{}',
+              metadata JSONB NOT NULL DEFAULT '{}',
+              size BIGINT NOT NULL DEFAULT 0,
+              checksum VARCHAR(255) NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              created_by UUID NOT NULL REFERENCES users(id),
+              UNIQUE(document_id, version_number)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_versions_document_id ON document_versions(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON document_versions(version_number);
+            CREATE INDEX IF NOT EXISTS idx_document_versions_created_at ON document_versions(created_at);
+            CREATE INDEX IF NOT EXISTS idx_document_versions_created_by ON document_versions(created_by);
+          `
+        },
+        {
+          name: '010_create_tags_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS tags (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name VARCHAR(100) NOT NULL UNIQUE,
+              color VARCHAR(7),
+              description TEXT,
+              created_by UUID NOT NULL REFERENCES users(id),
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
+            CREATE INDEX IF NOT EXISTS idx_tags_created_by ON tags(created_by);
+          `
+        },
+        {
+          name: '011_create_document_tags_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS document_tags (
+              document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+              tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+              PRIMARY KEY (document_id, tag_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_tags_document_id ON document_tags(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_tags_tag_id ON document_tags(tag_id);
+          `
+        },
+        {
+          name: '012_create_document_permissions_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS document_permissions (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+              user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+              group_id UUID,
+              role_id UUID,
+              permissions JSONB NOT NULL DEFAULT '[]',
+              granted_by UUID NOT NULL REFERENCES users(id),
+              granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              expires_at TIMESTAMP,
+              is_active BOOLEAN NOT NULL DEFAULT true
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_permissions_document_id ON document_permissions(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_permissions_user_id ON document_permissions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_document_permissions_granted_by ON document_permissions(granted_by);
+            CREATE INDEX IF NOT EXISTS idx_document_permissions_is_active ON document_permissions(is_active);
+          `
+        },
+        {
+          name: '013_create_document_comments_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS document_comments (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+              user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              content TEXT NOT NULL,
+              parent_id UUID REFERENCES document_comments(id) ON DELETE CASCADE,
+              mentions JSONB DEFAULT '[]',
+              attachments JSONB DEFAULT '[]',
+              is_resolved BOOLEAN NOT NULL DEFAULT false,
+              resolved_by UUID REFERENCES users(id),
+              resolved_at TIMESTAMP,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              deleted_at TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_comments_document_id ON document_comments(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_comments_user_id ON document_comments(user_id);
+            CREATE INDEX IF NOT EXISTS idx_document_comments_parent_id ON document_comments(parent_id);
+            CREATE INDEX IF NOT EXISTS idx_document_comments_created_at ON document_comments(created_at);
+            CREATE INDEX IF NOT EXISTS idx_document_comments_is_resolved ON document_comments(is_resolved);
+          `
+        },
+        {
+          name: '014_create_document_activities_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS document_activities (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+              user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              action VARCHAR(100) NOT NULL,
+              description TEXT NOT NULL,
+              metadata JSONB DEFAULT '{}',
+              ip_address INET,
+              user_agent TEXT,
+              timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_activities_document_id ON document_activities(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_activities_user_id ON document_activities(user_id);
+            CREATE INDEX IF NOT EXISTS idx_document_activities_action ON document_activities(action);
+            CREATE INDEX IF NOT EXISTS idx_document_activities_timestamp ON document_activities(timestamp);
+          `
         }
       ];
 
