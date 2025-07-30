@@ -566,6 +566,108 @@ export class DatabaseService {
             CREATE INDEX IF NOT EXISTS idx_document_activities_action ON document_activities(action);
             CREATE INDEX IF NOT EXISTS idx_document_activities_timestamp ON document_activities(timestamp);
           `
+        },
+        {
+          name: '015_create_folders_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS folders (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name VARCHAR(255) NOT NULL,
+              description TEXT,
+              type VARCHAR(50) NOT NULL DEFAULT 'regular',
+              status VARCHAR(50) NOT NULL DEFAULT 'active',
+              access_level VARCHAR(50) NOT NULL DEFAULT 'internal',
+              parent_id UUID REFERENCES folders(id) ON DELETE CASCADE,
+              path TEXT NOT NULL,
+              level INTEGER NOT NULL DEFAULT 0,
+              position INTEGER NOT NULL DEFAULT 0,
+              left_bound INTEGER NOT NULL,
+              right_bound INTEGER NOT NULL,
+              has_children BOOLEAN NOT NULL DEFAULT false,
+              metadata JSONB NOT NULL DEFAULT '{}',
+              document_count INTEGER NOT NULL DEFAULT 0,
+              subfolder_count INTEGER NOT NULL DEFAULT 0,
+              total_size BIGINT NOT NULL DEFAULT 0,
+              last_activity_at TIMESTAMP,
+              is_shared BOOLEAN NOT NULL DEFAULT false,
+              is_locked BOOLEAN NOT NULL DEFAULT false,
+              locked_by UUID REFERENCES users(id),
+              locked_at TIMESTAMP,
+              lock_reason TEXT,
+              template_id UUID REFERENCES folders(id),
+              is_template BOOLEAN NOT NULL DEFAULT false,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              deleted_at TIMESTAMP,
+              created_by UUID REFERENCES users(id),
+              updated_by UUID REFERENCES users(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(name);
+            CREATE INDEX IF NOT EXISTS idx_folders_type ON folders(type);
+            CREATE INDEX IF NOT EXISTS idx_folders_status ON folders(status);
+            CREATE INDEX IF NOT EXISTS idx_folders_access_level ON folders(access_level);
+            CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id);
+            CREATE INDEX IF NOT EXISTS idx_folders_path ON folders(path);
+            CREATE INDEX IF NOT EXISTS idx_folders_level ON folders(level);
+            CREATE INDEX IF NOT EXISTS idx_folders_left_bound ON folders(left_bound);
+            CREATE INDEX IF NOT EXISTS idx_folders_right_bound ON folders(right_bound);
+            CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by);
+            CREATE INDEX IF NOT EXISTS idx_folders_created_at ON folders(created_at);
+            CREATE INDEX IF NOT EXISTS idx_folders_updated_at ON folders(updated_at);
+            CREATE INDEX IF NOT EXISTS idx_folders_deleted_at ON folders(deleted_at);
+            CREATE INDEX IF NOT EXISTS idx_folders_is_shared ON folders(is_shared);
+            CREATE INDEX IF NOT EXISTS idx_folders_is_locked ON folders(is_locked);
+            CREATE INDEX IF NOT EXISTS idx_folders_is_template ON folders(is_template);
+            CREATE INDEX IF NOT EXISTS idx_folders_nested_set ON folders(left_bound, right_bound);
+          `
+        },
+        {
+          name: '016_create_folder_permissions_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS folder_permissions (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              folder_id UUID NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+              user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+              group_id UUID,
+              role_id UUID,
+              permissions JSONB NOT NULL DEFAULT '[]',
+              inherited BOOLEAN NOT NULL DEFAULT false,
+              granted_by UUID NOT NULL REFERENCES users(id),
+              granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              expires_at TIMESTAMP,
+              is_active BOOLEAN NOT NULL DEFAULT true
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_folder_id ON folder_permissions(folder_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_user_id ON folder_permissions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_group_id ON folder_permissions(group_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_role_id ON folder_permissions(role_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_granted_by ON folder_permissions(granted_by);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_is_active ON folder_permissions(is_active);
+            CREATE INDEX IF NOT EXISTS idx_folder_permissions_expires_at ON folder_permissions(expires_at);
+          `
+        },
+        {
+          name: '017_create_folder_activities_table',
+          sql: `
+            CREATE TABLE IF NOT EXISTS folder_activities (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              folder_id UUID NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+              user_id UUID NOT NULL REFERENCES users(id),
+              action VARCHAR(100) NOT NULL,
+              description TEXT NOT NULL,
+              metadata JSONB,
+              ip_address INET,
+              user_agent TEXT,
+              timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_folder_activities_folder_id ON folder_activities(folder_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_activities_user_id ON folder_activities(user_id);
+            CREATE INDEX IF NOT EXISTS idx_folder_activities_action ON folder_activities(action);
+            CREATE INDEX IF NOT EXISTS idx_folder_activities_timestamp ON folder_activities(timestamp);
+          `
         }
       ];
 
