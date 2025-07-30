@@ -1,9 +1,17 @@
 #!/usr/bin/env sh
+# Windows-compatible pre-commit hook
+# Skip if running in problematic WSL environment
+if [ -n "$WSL_DISTRO_NAME" ] && [ ! -f "/bin/bash" ]; then
+  echo "Skipping pre-commit hook due to WSL environment issues"
+  exit 0
+fi
+
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run lint-staged on Windows (skip if WSL issues)
+# Run lint-staged with proper error handling
 if command -v npx >/dev/null 2>&1; then
   npx lint-staged
 else
-  echo "Skipping lint-staged due to environment issues"
+  echo "Warning: npx not found, skipping lint-staged"
+  exit 0
 fi

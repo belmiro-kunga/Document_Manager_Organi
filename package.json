@@ -43,7 +43,10 @@
     "docker:health": "powershell -ExecutionPolicy Bypass -File docker/scripts/health-check.ps1",
     "docker:manager": "node scripts/dev-docker.js",
     "setup:hot-reload": "node scripts/setup-hot-reload.js",
-    "postinstall": "echo 'Husky disabled on Windows'"
+    "husky:fix": "powershell -ExecutionPolicy Bypass -File scripts/fix-husky-windows.ps1",
+    "husky:test": "powershell -ExecutionPolicy Bypass -File scripts/test-husky-simple.ps1",
+    "lint:manual": "powershell -ExecutionPolicy Bypass -File scripts/manual-lint.ps1",
+    "postinstall": "echo 'Run npm run husky:fix to configure Husky for your environment'"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.6.7",

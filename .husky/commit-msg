@@ -1,5 +1,17 @@
 #!/usr/bin/env sh
+# Windows-compatible commit-msg hook
+# Skip if running in problematic WSL environment
+if [ -n "$WSL_DISTRO_NAME" ] && [ ! -f "/bin/bash" ]; then
+  echo "Skipping commit-msg hook due to WSL environment issues"
+  exit 0
+fi
+
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run commitlint
-npx --no-install commitlint --edit "$1"
+# Run commitlint with proper error handling
+if command -v npx >/dev/null 2>&1; then
+  npx --no-install commitlint --edit "$1"
+else
+  echo "Warning: npx not found, skipping commitlint"
+  exit 0
+fi
