@@ -158,19 +158,6 @@ export class UserRepository {
   }
 
   /**
-   * Find user by email or username
-   */
-  async findByEmailOrUsername(emailOrUsername: string): Promise<AuthUser | null> {
-    const query = `
-      SELECT * FROM users 
-      WHERE (email = $1 OR username = $1) AND deleted_at IS NULL
-    `;
-
-    const result = await this.db.query<UserRow>(query, [emailOrUsername]);
-    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
-  }
-
-  /**
    * Update user
    */
   async update(id: string, userData: UpdateUserInput, updatedBy?: string): Promise<AuthUser | null> {
@@ -195,313 +182,210 @@ export class UserRepository {
       updateFields.push(`username = $${paramIndex++}`);
       values.push(userData.username);
     }
-    if (userDateData.position !== undefined) {
-        updateFields.push(`position = $${paramIndex++}`);
-        values.push(updateData.position);
-      }
-      if (updateData.phone !== undefined) {
-        updateFields.push(`phone = $${paramIndex++}`);
-        values.push(updateData.phone);
-      }
-      if (updateData.isActive !== undefined) {
-        updateFields.push(`is_active = $${paramIndex++}`);
-        values.push(updateData.isActive);
-      }
-      if (updateData.preferences !== undefined) {
-        updateFields.push(`preferences = $${paramIndex++}`);
-        values.push(JSON.stringify(updateData.preferences));
-      }
-      if (updateData.profile !== undefined) {
-        updateFields.push(`profile = $${paramIndex++}`);
-        values.push(JSON.stringify(updateData.profile));
-      }
-
-      if (updateFields.length === 0) {
-        throw new ValidationError('No fields to update');
-      }
-
-      // Add updated_at and user ID
-      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
-      values.push(id);
-
-      const query = `
-        UPDATE users 
-        SET ${updateFields.join(', ')}
-        WHERE id = $${paramIndex} AND deleted_at IS NULL
-        RETURNING *
-      `;
-
-      const result = await DatabaseService.query<any>(query, values);
-      
-      if (result.rows.length === 0) {
-        throw new AppError('USER_NOT_FOUND', 'User not found or already deleted', 404);
-      }
-
-      const user = this.mapRowToUser(result.rows[0]);
-      
-      logger.info('User updated successfully', {
-        userId: user.id,
-        updatedFields: Object.keys(updateData)
-      });
-
-      return user;
-    } catch (error) {
-      logger.error('Failed to update user', { error, userId: id, updateData });
-      throw error;
+    if (userData.role !== undefined) {
+      updateFields.push(`role = $${paramIndex++}`);
+      values.push(userData.role);
     }
+    if (userData.language !== undefined) {
+      updateFields.push(`language = $${paramIndex++}`);
+      values.push(userData.language);
+    }
+    if (userData.department !== undefined) {
+      updateFields.push(`department = $${paramIndex++}`);
+      values.push(userData.department);
+    }
+    if (userData.position !== undefined) {
+      updateFields.push(`position = $${paramIndex++}`);
+      values.push(userData.position);
+    }
+    if (userData.phone !== undefined) {
+      updateFields.push(`phone = $${paramIndex++}`);
+      values.push(userData.phone);
+    }
+    if (userData.isActive !== undefined) {
+      updateFields.push(`is_active = $${paramIndex++}`);
+      values.push(userData.isActive);
+    }
+    if (userData.preferences !== undefined) {
+      updateFields.push(`preferences = $${paramIndex++}`);
+      values.push(JSON.stringify(userData.preferences));
+    }
+    if (userData.profile !== undefined) {
+      updateFields.push(`profile = $${paramIndex++}`);
+      values.push(JSON.stringify(userData.profile));
+    }
+
+    if (updateFields.length === 0) {
+      return this.findById(id);
+    }
+
+    // Always update updated_at and updated_by
+    updateFields.push(`updated_at = NOW()`);
+    if (updatedBy) {
+      updateFields.push(`updated_by = $${paramIndex++}`);
+      values.push(updatedBy);
+    }
+
+    // Add ID parameter
+    values.push(id);
+
+    const query = `
+      UPDATE users 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex} AND deleted_at IS NULL
+      RETURNING *
+    `;
+
+    const result = await this.db.query<UserRow>(query, values);
+    return result.rows.length > 0 ? this.mapRowToUser(result.rows[0]) : null;
+  }
+
+  /**
+   * Update user password
+   */
+  async updatePassword(id: string, passwordHash: string, passwordSalt: string): Promise<boolean> {
+    const query = `
+      UPDATE users 
+      SET password_hash = $1, password_salt = $2, last_password_change = NOW(), updated_at = NOW()
+      WHERE id = $3 AND deleted_at IS NULL
+    `;
+
+    const result = await this.db.query(query, [passwordHash, passwordSalt, id]);
+    return result.rowCount > 0;
   }
 
   /**
    * Soft delete user
    */
-  public async softDelete(id: string): Promise<void> {
-    try {
-      const query = `
-        UPDATE users 
-        SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1 AND deleted_at IS NULL
-      `;
+  async softDelete(id: string, deletedBy?: string): Promise<boolean> {
+    const query = `
+      UPDATE users 
+      SET deleted_at = NOW(), updated_at = NOW(), updated_by = $2
+      WHERE id = $1 AND deleted_at IS NULL
+    `;
 
-      const result = await DatabaseService.query(query, [id]);
-      
-      if (result.rowCount === 0) {
-        throw new AppError('USER_NOT_FOUND', 'User not found or already deleted', 404);
-      }
-
-      logger.info('User soft deleted successfully', { userId: id });
-    } catch (error) {
-      logger.error('Failed to soft delete user', { error, userId: id });
-      throw error;
-    }
+    const result = await this.db.query(query, [id, deletedBy]);
+    return result.rowCount > 0;
   }
 
   /**
-   * Hard delete user (permanent)
+   * Search users with filters and pagination
    */
-  public async hardDelete(id: string): Promise<void> {
-    try {
-      await DatabaseService.transaction(async (client) => {
-        // Delete related records first
-        await client.query('DELETE FROM refresh_tokens WHERE user_id = $1', [id]);
-        await client.query('DELETE FROM oauth_providers WHERE user_id = $1', [id]);
-        await client.query('DELETE FROM api_keys WHERE user_id = $1', [id]);
-        await client.query('DELETE FROM security_events WHERE user_id = $1', [id]);
-        await client.query('DELETE FROM trusted_devices WHERE user_id = $1', [id]);
-        
-        // Delete user
-        const result = await client.query('DELETE FROM users WHERE id = $1', [id]);
-        
-        if (result.rowCount === 0) {
-          throw new AppError('USER_NOT_FOUND', 'User not found', 404);
-        }
-      });
+  async search(filters: UserSearchFilters & { page?: number; limit?: number; sortBy?: string; sortOrder?: string }) {
+    let query = `
+      SELECT * FROM users 
+      WHERE deleted_at IS NULL
+    `;
+    const values: any[] = [];
+    let paramIndex = 1;
 
-      logger.warn('User hard deleted permanently', { userId: id });
-    } catch (error) {
-      logger.error('Failed to hard delete user', { error, userId: id });
-      throw error;
+    // Apply filters
+    if (filters.query) {
+      query += ` AND (
+        first_name ILIKE $${paramIndex} OR 
+        last_name ILIKE $${paramIndex} OR 
+        email ILIKE $${paramIndex} OR 
+        username ILIKE $${paramIndex}
+      )`;
+      values.push(`%${filters.query}%`);
+      paramIndex++;
     }
-  }
 
-  /**
-   * Find users with filters and pagination
-   */
-  public async findMany(
-    filters: UserSearchFilters = {},
-    page = 1,
-    limit = 20
-  ): Promise<{ users: AuthUser[]; total: number; page: number; limit: number }> {
-    try {
-      const offset = (page - 1) * limit;
-      const whereConditions: string[] = ['deleted_at IS NULL'];
-      const values: any[] = [];
-      let paramIndex = 1;
+    if (filters.role) {
+      query += ` AND role = $${paramIndex}`;
+      values.push(filters.role);
+      paramIndex++;
+    }
 
-      // Build WHERE conditions
-      if (filters.query) {
-        whereConditions.push(`(
-          first_name ILIKE $${paramIndex} OR 
-          last_name ILIKE $${paramIndex} OR 
-          email ILIKE $${paramIndex} OR 
-          username ILIKE $${paramIndex}
-        )`);
-        values.push(`%${filters.query}%`);
-        paramIndex++;
-      }
+    if (filters.department) {
+      query += ` AND department = $${paramIndex}`;
+      values.push(filters.department);
+      paramIndex++;
+    }
 
-      if (filters.role) {
-        whereConditions.push(`role = $${paramIndex++}`);
-        values.push(filters.role);
-      }
+    if (filters.isActive !== undefined) {
+      query += ` AND is_active = $${paramIndex}`;
+      values.push(filters.isActive);
+      paramIndex++;
+    }
 
-      if (filters.department) {
-        whereConditions.push(`department = $${paramIndex++}`);
-        values.push(filters.department);
-      }
+    // Count total records
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countResult = await this.db.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].count);
 
-      if (filters.isActive !== undefined) {
-        whereConditions.push(`is_active = $${paramIndex++}`);
-        values.push(filters.isActive);
-      }
+    // Apply sorting
+    const sortBy = filters.sortBy || 'created_at';
+    const sortOrder = filters.sortOrder || 'desc';
+    query += ` ORDER BY ${sortBy} ${sortOrder.toUpperCase()}`;
 
-      if (filters.isEmailVerified !== undefined) {
-        if (filters.isEmailVerified) {
-          whereConditions.push('email_verified_at IS NOT NULL');
-        } else {
-          whereConditions.push('email_verified_at IS NULL');
-        }
-      }
+    // Apply pagination
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
 
-      if (filters.createdAfter) {
-        whereConditions.push(`created_at >= $${paramIndex++}`);
-        values.push(filters.createdAfter);
-      }
+    query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    values.push(limit, offset);
 
-      if (filters.createdBefore) {
-        whereConditions.push(`created_at <= $${paramIndex++}`);
-        values.push(filters.createdBefore);
-      }
+    const result = await this.db.query<UserRow>(query, values);
+    const users = result.rows.map(row => this.mapRowToUser(row));
 
-      if (filters.lastLoginAfter) {
-        whereConditions.push(`last_login_at >= $${paramIndex++}`);
-        values.push(filters.lastLoginAfter);
-      }
-
-      if (filters.lastLoginBefore) {
-        whereConditions.push(`last_login_at <= $${paramIndex++}`);
-        values.push(filters.lastLoginBefore);
-      }
-
-      const whereClause = whereConditions.join(' AND ');
-
-      // Count total records
-      const countQuery = `SELECT COUNT(*) as total FROM users WHERE ${whereClause}`;
-      const countResult = await DatabaseService.query<{ total: string }>(countQuery, values);
-      const total = parseInt(countResult.rows[0].total);
-
-      // Get paginated results
-      const dataQuery = `
-        SELECT * FROM users 
-        WHERE ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT $${paramIndex++} OFFSET $${paramIndex}
-      `;
-      values.push(limit, offset);
-
-      const dataResult = await DatabaseService.query<any>(dataQuery, values);
-      const users = dataResult.rows.map(row => this.mapRowToUser(row));
-
-      return {
-        users,
-        total,
+    return {
+      users,
+      pagination: {
         page,
-        limit
-      };
-    } catch (error) {
-      logger.error('Failed to find users', { error, filters, page, limit });
-      throw error;
-    }
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
   }
 
   /**
-   * Update user login information
+   * Check if email exists
    */
-  public async updateLoginInfo(
-    id: string, 
-    loginInfo: { 
-      lastLoginAt: Date; 
-      lastLoginIp: string; 
-      sessionId?: string;
-      resetLoginAttempts?: boolean;
+  async emailExists(email: string, excludeId?: string): Promise<boolean> {
+    let query = `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL`;
+    const values: any[] = [email];
+
+    if (excludeId) {
+      query += ` AND id != $2`;
+      values.push(excludeId);
     }
-  ): Promise<void> {
-    try {
-      const updateFields = [
-        'last_login_at = $2',
-        'last_login_ip = $3',
-        'updated_at = CURRENT_TIMESTAMP'
-      ];
-      const values = [id, loginInfo.lastLoginAt, loginInfo.lastLoginIp];
-      let paramIndex = 4;
 
-      if (loginInfo.sessionId) {
-        updateFields.push(`current_session_id = $${paramIndex++}`);
-        values.push(loginInfo.sessionId);
-      }
-
-      if (loginInfo.resetLoginAttempts) {
-        updateFields.push('login_attempts = 0', 'locked_until = NULL');
-      }
-
-      const query = `
-        UPDATE users 
-        SET ${updateFields.join(', ')}
-        WHERE id = $1 AND deleted_at IS NULL
-      `;
-
-      await DatabaseService.query(query, values);
-      
-      logger.info('User login info updated', { userId: id });
-    } catch (error) {
-      logger.error('Failed to update user login info', { error, userId: id });
-      throw error;
-    }
+    const result = await this.db.query(query, values);
+    return result.rows.length > 0;
   }
 
   /**
-   * Increment login attempts
+   * Check if username exists
    */
-  public async incrementLoginAttempts(id: string, lockoutDuration?: number): Promise<void> {
-    try {
-      let query = `
-        UPDATE users 
-        SET login_attempts = login_attempts + 1, updated_at = CURRENT_TIMESTAMP
-      `;
-      const values = [id];
+  async usernameExists(username: string, excludeId?: string): Promise<boolean> {
+    let query = `SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL`;
+    const values: any[] = [username];
 
-      if (lockoutDuration) {
-        query += `, locked_until = CURRENT_TIMESTAMP + INTERVAL '${lockoutDuration} milliseconds'`;
-      }
-
-      query += ' WHERE id = $1 AND deleted_at IS NULL';
-
-      await DatabaseService.query(query, values);
-      
-      logger.warn('User login attempts incremented', { userId: id, lockoutDuration });
-    } catch (error) {
-      logger.error('Failed to increment login attempts', { error, userId: id });
-      throw error;
+    if (excludeId) {
+      query += ` AND id != $2`;
+      values.push(excludeId);
     }
+
+    const result = await this.db.query(query, values);
+    return result.rows.length > 0;
   }
 
   /**
-   * Check if user exists by email or username
+   * Get user count
    */
-  public async existsByEmailOrUsername(email: string, username: string, excludeId?: string): Promise<boolean> {
-    try {
-      let query = `
-        SELECT COUNT(*) as count FROM users 
-        WHERE (email = $1 OR username = $2) AND deleted_at IS NULL
-      `;
-      const values = [email, username];
-
-      if (excludeId) {
-        query += ' AND id != $3';
-        values.push(excludeId);
-      }
-
-      const result = await DatabaseService.query<{ count: string }>(query, values);
-      return parseInt(result.rows[0].count) > 0;
-    } catch (error) {
-      logger.error('Failed to check user existence', { error, email, username });
-      throw error;
-    }
+  async count(): Promise<number> {
+    const query = `SELECT COUNT(*) as count FROM users WHERE deleted_at IS NULL`;
+    const result = await this.db.query(query);
+    return parseInt(result.rows[0].count);
   }
 
   /**
-   * Map database row to User object
+   * Map database row to user object
    */
-  private mapRowToUser(row: any): AuthUser {
+  private mapRowToUser(row: UserRow): AuthUser {
     return {
       id: row.id,
       email: row.email,
@@ -510,8 +394,8 @@ export class UserRepository {
       lastName: row.last_name,
       passwordHash: row.password_hash,
       passwordSalt: row.password_salt,
-      role: row.role,
-      language: row.language,
+      role: row.role as UserRole,
+      language: row.language as SupportedLanguage,
       department: row.department,
       position: row.position,
       phone: row.phone,
@@ -526,22 +410,21 @@ export class UserRepository {
       lockedUntil: row.locked_until,
       twoFactorSecret: row.two_factor_secret,
       twoFactorEnabled: row.two_factor_enabled,
+      twoFactorBackupCodes: [],
+      refreshTokens: [],
       lastLoginAt: row.last_login_at,
       lastLoginIp: row.last_login_ip,
       currentSessionId: row.current_session_id,
-      preferences: row.preferences ? JSON.parse(row.preferences) : {},
-      securitySettings: row.security_settings ? JSON.parse(row.security_settings) : {},
-      profile: row.profile ? JSON.parse(row.profile) : {},
+      oauthProviders: [],
+      apiKeys: [],
+      preferences: row.preferences || {},
+      securitySettings: row.security_settings || {},
+      profile: row.profile || {},
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       deletedAt: row.deleted_at,
       createdBy: row.created_by,
-      updatedBy: row.updated_by,
-      // These will be loaded separately when needed
-      refreshTokens: [],
-      oauthProviders: [],
-      apiKeys: [],
-      twoFactorBackupCodes: []
+      updatedBy: row.updated_by
     };
   }
 }
